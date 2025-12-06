@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileText, Activity, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Activity, AlertCircle, X } from 'lucide-react';
 import { analyzePaper } from './services/geminiService';
 import { TreeVisualizer } from './components/TreeVisualizer';
 import { ConceptDetail } from './components/ConceptDetail';
@@ -11,6 +11,7 @@ function App() {
   const [treeData, setTreeData] = useState<TreeData | null>(null);
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
 
   // Cleanup object URL when component unmounts or url changes
   useEffect(() => {
@@ -197,8 +198,34 @@ function App() {
             pdfUrl={pdfUrl}
             onUpdateNode={handleUpdateNode}
             onExpandNode={handleExpandNode}
+            onViewImage={setViewingImageUrl}
          />
       </aside>
+
+      {/* Fullscreen Image Modal */}
+      {viewingImageUrl && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+            onClick={() => setViewingImageUrl(null)}
+          >
+              <button 
+                  className="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors z-50"
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      setViewingImageUrl(null);
+                  }}
+              >
+                  <X size={32} />
+              </button>
+              
+              <img 
+                src={viewingImageUrl} 
+                alt="Full size concept" 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300 select-none"
+                onClick={(e) => e.stopPropagation()} 
+              />
+          </div>
+      )}
     </div>
   );
 }

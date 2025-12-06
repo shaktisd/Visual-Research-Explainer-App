@@ -4,19 +4,6 @@ import { ConceptNode } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Schema for extracted figures (tables/charts)
-const figureSchema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    type: { type: Type.STRING, enum: ["table", "chart", "diagram"] },
-    content: { type: Type.STRING, description: "If table: Markdown formatted table. If chart/diagram: Detailed text description of what is visually shown." },
-    insight: { type: Type.STRING, description: "The specific conclusion or data point this figure proves." },
-    pageNumber: { type: Type.INTEGER, description: "The specific page number (1-indexed) in the PDF where this figure is located." }
-  },
-  required: ["title", "type", "content", "insight", "pageNumber"]
-};
-
 // Shared properties to ensure consistency
 const baseNodeProperties = {
   id: { type: Type.STRING },
@@ -24,12 +11,7 @@ const baseNodeProperties = {
   description: { type: Type.STRING },
   simpleExplanation: { type: Type.STRING },
   analogy: { type: Type.STRING },
-  imagePrompt: { type: Type.STRING },
-  figures: { 
-    type: Type.ARRAY, 
-    items: figureSchema,
-    description: "Any charts, tables, or diagrams from the paper that support this specific concept."
-  }
+  imagePrompt: { type: Type.STRING }
 };
 
 // Define explicit schema levels to prevent "empty properties" error in deep recursion
@@ -110,14 +92,6 @@ export async function analyzePaper(base64Data: string, mimeType: string): Promis
             2. Children are main sections or core pillars of the research.
             3. Further descendants are periphery concepts, definitions, or specific mechanism details explaining the parent.
             4. Ensure no concept is left unexplained. If a concept is complex, break it down further.
-            
-            IMPORTANT: EXTRACT VISUAL DATA
-            For each concept, if the paper contains a relevant Table, Chart, or Diagram:
-            - Extract it into the 'figures' array.
-            - Identify the EXACT Page Number it appears on.
-            - For Tables: Convert the data into a clean Markdown table format in 'content'.
-            - For Charts: Describe the visual trends, axes, and data points in 'content'.
-            - Provide the 'insight' derived from that figure.
             
             For EACH node, provide:
             - id: A unique string ID.

@@ -1,25 +1,25 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ConceptNode, ExtractedFigure } from '../types';
+import { ConceptNode } from '../types';
 import { generateConceptImage, expandNodeWithAI, askQuestionOnNode } from '../services/geminiService';
-import { Sparkles, RefreshCw, ChevronRight, BookOpen, Lightbulb, Image as ImageIcon, MessageSquare, Send, BarChart2, FileText, Info, Eye } from 'lucide-react';
+import { Sparkles, RefreshCw, ChevronRight, BookOpen, Lightbulb, Image as ImageIcon, MessageSquare, Send, FileText, Maximize2 } from 'lucide-react';
 
 interface ConceptDetailProps {
   node: ConceptNode | null;
   pdfUrl: string | null;
   onUpdateNode: (node: ConceptNode) => void;
   onExpandNode: (parentNode: ConceptNode, newChildren: ConceptNode[]) => void;
+  onViewImage: (url: string) => void;
 }
 
-type Tab = 'explain' | 'evidence' | 'qa';
+type Tab = 'explain' | 'qa';
 
-export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUpdateNode, onExpandNode }) => {
+export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUpdateNode, onExpandNode, onViewImage }) => {
   const [loadingImage, setLoadingImage] = useState(false);
   const [loadingExpansion, setLoadingExpansion] = useState(false);
   const [questionInput, setQuestionInput] = useState('');
   const [isAsking, setIsAsking] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('explain');
-  const [selectedFigure, setSelectedFigure] = useState<ExtractedFigure | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,15 +29,7 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUp
     }
     // Default to explain tab when switching nodes
     setActiveTab('explain');
-    setSelectedFigure(null);
   }, [node]);
-
-  // When switching to evidence tab, auto-select first figure if available
-  useEffect(() => {
-      if (activeTab === 'evidence' && node?.figures && node.figures.length > 0 && !selectedFigure) {
-          setSelectedFigure(node.figures[0]);
-      }
-  }, [activeTab, node]);
 
   const generateImage = async () => {
     if (!node) return;
@@ -88,31 +80,6 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUp
       setActiveTab('qa');
   };
 
-  const renderMarkdownTable = (content: string) => {
-    const rows = content.trim().split('\n').filter(r => r.trim().startsWith('|'));
-    if (rows.length < 2) return <pre className="text-xs bg-slate-50 p-2 overflow-x-auto whitespace-pre-wrap font-mono">{content}</pre>;
-
-    return (
-        <div className="overflow-x-auto border border-slate-200 rounded-lg">
-            <table className="min-w-full text-sm text-left">
-                <tbody>
-                    {rows.map((row, i) => {
-                        const cells = row.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-                        if (row.includes('---')) return null;
-                        return (
-                            <tr key={i} className={i === 0 ? "bg-slate-100 font-bold" : "border-t border-slate-100"}>
-                                {cells.map((cell, cIdx) => (
-                                    <td key={cIdx} className="px-4 py-2 whitespace-nowrap">{cell.trim()}</td>
-                                ))}
-                            </tr>
-                        )
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
-  };
-
   if (!node) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center">
@@ -127,9 +94,20 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUp
     <div className="h-full flex flex-col bg-white border-l border-slate-200 shadow-xl">
       
       {/* Header Image Area */}
-      <div className="relative w-full h-40 bg-slate-100 flex items-center justify-center group overflow-hidden shrink-0">
+      <div 
+        className="relative w-full h-56 bg-slate-100 flex items-center justify-center group overflow-hidden shrink-0 cursor-pointer"
+        onClick={() => node.imageUrl && onViewImage(node.imageUrl)}
+      >
         {node.imageUrl ? (
-            <img src={node.imageUrl} alt={node.label} className="w-full h-full object-cover" />
+            <>
+                <img src={node.imageUrl} alt={node.label} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                     <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 bg-white/90 text-slate-700 px-3 py-2 rounded-full shadow-lg flex items-center gap-2 text-xs font-bold">
+                        <Maximize2 size={14} />
+                        <span>View Fullscreen</span>
+                     </div>
+                </div>
+            </>
         ) : (
             <div className="flex flex-col items-center text-slate-400">
                 {loadingImage ? <RefreshCw className="w-6 h-6 animate-spin mb-1" /> : <ImageIcon className="w-8 h-8 mb-1 opacity-50" />}
@@ -145,15 +123,6 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUp
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center ${activeTab === 'explain' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
           >
               <FileText size={16} className="mr-2" /> Explanation
-          </button>
-          <button 
-            onClick={() => setActiveTab('evidence')}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center ${activeTab === 'evidence' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-          >
-              <BarChart2 size={16} className="mr-2" /> Data & Evidence
-              {node.figures && node.figures.length > 0 && (
-                  <span className="ml-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full text-xs">{node.figures.length}</span>
-              )}
           </button>
           <button 
             onClick={() => setActiveTab('qa')}
@@ -204,82 +173,6 @@ export const ConceptDetail: React.FC<ConceptDetailProps> = ({ node, pdfUrl, onUp
                     {loadingExpansion ? <RefreshCw className="animate-spin mr-2" size={18} /> : <ChevronRight className="mr-2" size={18} />}
                     {loadingExpansion ? 'Expanding Chain of Thought...' : 'Deep Dive (Add Sub-concepts)'}
                  </button>
-            </div>
-        )}
-
-        {activeTab === 'evidence' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {!node.figures || node.figures.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400">
-                        <BarChart2 className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                        <p className="text-sm">No specific tables or charts extracted for this concept.</p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Figure Selection List */}
-                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                            {node.figures.map((fig, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => setSelectedFigure(fig)}
-                                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
-                                        selectedFigure === fig 
-                                            ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    {fig.type.charAt(0).toUpperCase() + fig.type.slice(1)} {idx + 1}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Selected Figure Detail */}
-                        {selectedFigure && (
-                            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-in fade-in zoom-in-95 duration-200">
-                                <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-                                    <h4 className="font-semibold text-slate-800 text-sm truncate pr-2">{selectedFigure.title}</h4>
-                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${selectedFigure.type === 'table' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                        Pg {selectedFigure.pageNumber}
-                                    </span>
-                                </div>
-                                
-                                {/* PDF Viewer (Source) */}
-                                {pdfUrl && (
-                                   <div className="relative w-full bg-slate-100 border-b border-slate-200">
-                                       <div className="absolute top-2 right-2 z-10 bg-black/50 text-white text-[10px] px-2 py-1 rounded pointer-events-none">
-                                           Original Source (Page {selectedFigure.pageNumber})
-                                       </div>
-                                       <iframe 
-                                            src={`${pdfUrl}#page=${selectedFigure.pageNumber}&view=FitH`} 
-                                            className="w-full h-64 lg:h-80" 
-                                            title={`PDF Source Page ${selectedFigure.pageNumber}`}
-                                       />
-                                       <div className="p-2 bg-slate-50 text-[10px] text-slate-400 text-center border-t border-slate-200">
-                                           Scroll PDF to find figure if not immediately visible
-                                       </div>
-                                   </div>
-                                )}
-
-                                <div className="p-4 bg-white">
-                                    <h5 className="text-xs font-bold text-slate-400 uppercase mb-2">AI Extraction</h5>
-                                    {selectedFigure.type === 'table' ? (
-                                        renderMarkdownTable(selectedFigure.content)
-                                    ) : (
-                                        <div className="bg-slate-50 p-3 rounded text-sm text-slate-600 font-mono whitespace-pre-wrap border border-slate-100">
-                                            {selectedFigure.content}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="bg-amber-50 px-4 py-3 border-t border-amber-100">
-                                    <div className="flex items-start">
-                                        <Info size={14} className="text-amber-500 mt-0.5 mr-2 shrink-0" />
-                                        <p className="text-xs text-amber-900 italic">{selectedFigure.insight}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
             </div>
         )}
 
