@@ -35,3 +35,19 @@ export interface ProcessingStatus {
   step: 'idle' | 'uploading' | 'analyzing' | 'visualizing' | 'error';
   message?: string;
 }
+
+export interface ResearchDocument {
+  id: string;
+  name: string;
+  fileType: string;
+  contentBase64: string; // Stored for export/import portability
+  treeData: TreeData | null;
+  status: ProcessingStatus;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: number;
+  documents: ResearchDocument[];
+}
