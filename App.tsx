@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+
+import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, FileText, Activity, AlertCircle } from 'lucide-react';
 import { analyzePaper } from './services/geminiService';
 import { TreeVisualizer } from './components/TreeVisualizer';
@@ -9,6 +10,16 @@ function App() {
   const [status, setStatus] = useState<ProcessingStatus>({ step: 'idle' });
   const [treeData, setTreeData] = useState<TreeData | null>(null);
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  // Cleanup object URL when component unmounts or url changes
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
 
   // File Upload Handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,6 +35,14 @@ function App() {
       }
 
       setStatus({ step: 'analyzing', message: 'Reading document and building concept tree...' });
+
+      // Create URL for PDF rendering if it is a PDF
+      if (file.type === 'application/pdf') {
+          const url = URL.createObjectURL(file);
+          setPdfUrl(url);
+      } else {
+          setPdfUrl(null);
+      }
 
       // Convert to Base64
       const reader = new FileReader();
@@ -175,6 +194,7 @@ function App() {
       <aside className={`w-[400px] shrink-0 transform transition-transform duration-300 ease-in-out absolute right-0 top-16 bottom-0 z-30 lg:relative lg:top-0 lg:block bg-white shadow-2xl lg:shadow-none ${status.step === 'visualizing' ? 'translate-x-0' : 'translate-x-full lg:translate-x-0 lg:hidden'}`}>
          <ConceptDetail 
             node={selectedNode} 
+            pdfUrl={pdfUrl}
             onUpdateNode={handleUpdateNode}
             onExpandNode={handleExpandNode}
          />

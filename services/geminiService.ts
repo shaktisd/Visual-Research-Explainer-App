@@ -1,7 +1,21 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ConceptNode } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Schema for extracted figures (tables/charts)
+const figureSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    type: { type: Type.STRING, enum: ["table", "chart", "diagram"] },
+    content: { type: Type.STRING, description: "If table: Markdown formatted table. If chart/diagram: Detailed text description of what is visually shown." },
+    insight: { type: Type.STRING, description: "The specific conclusion or data point this figure proves." },
+    pageNumber: { type: Type.INTEGER, description: "The specific page number (1-indexed) in the PDF where this figure is located." }
+  },
+  required: ["title", "type", "content", "insight", "pageNumber"]
+};
 
 // Shared properties to ensure consistency
 const baseNodeProperties = {
@@ -11,6 +25,11 @@ const baseNodeProperties = {
   simpleExplanation: { type: Type.STRING },
   analogy: { type: Type.STRING },
   imagePrompt: { type: Type.STRING },
+  figures: { 
+    type: Type.ARRAY, 
+    items: figureSchema,
+    description: "Any charts, tables, or diagrams from the paper that support this specific concept."
+  }
 };
 
 // Define explicit schema levels to prevent "empty properties" error in deep recursion
@@ -91,6 +110,14 @@ export async function analyzePaper(base64Data: string, mimeType: string): Promis
             2. Children are main sections or core pillars of the research.
             3. Further descendants are periphery concepts, definitions, or specific mechanism details explaining the parent.
             4. Ensure no concept is left unexplained. If a concept is complex, break it down further.
+            
+            IMPORTANT: EXTRACT VISUAL DATA
+            For each concept, if the paper contains a relevant Table, Chart, or Diagram:
+            - Extract it into the 'figures' array.
+            - Identify the EXACT Page Number it appears on.
+            - For Tables: Convert the data into a clean Markdown table format in 'content'.
+            - For Charts: Describe the visual trends, axes, and data points in 'content'.
+            - Provide the 'insight' derived from that figure.
             
             For EACH node, provide:
             - id: A unique string ID.
@@ -177,5 +204,33 @@ export async function expandNodeWithAI(nodeContext: ConceptNode): Promise<Concep
     } catch (e) {
         console.error("Expansion failed", e);
         return [];
+    }
+}
+
+export async function askQuestionOnNode(nodeContext: ConceptNode, question: string): Promise<string> {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [{
+                    text: `You are a research tutor. The user is currently studying the specific concept: "${nodeContext.label}".
+                    
+                    Concept Context:
+                    Description: ${nodeContext.description}
+                    Analogy: ${nodeContext.analogy}
+                    Simple Explanation: ${nodeContext.simpleExplanation}
+                    
+                    User Question: "${question}"
+                    
+                    Provide a clear, concise answer (max 3 sentences) that directly addresses the question using the context of this concept. 
+                    Do not introduce unrelated information.`
+                }]
+            },
+        });
+        
+        return response.text || "I couldn't generate an answer at this time.";
+    } catch (e) {
+        console.error("Q&A failed", e);
+        return "Sorry, I encountered an error while answering your question.";
     }
 }
